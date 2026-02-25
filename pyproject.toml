@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vectra"
+version = "0.1.0"
+description = "Improving LLM reasoning accuracy via multi-agent optimization (OpenAI-compatible)."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Your Name" }]
+license = { text = "Proprietary" }
+keywords = ["llm", "reasoning", "reasoning-accuracy", "multi-agent", "optimization", "orchestration", "batching"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: Other/Proprietary License",
+]
+dependencies = [
+  "httpx>=0.26",
+]
+
+[project.scripts]
+vectra = "vectra.__main__:main"
+
+[project.urls]
+Documentation = "https://example.com"
+Repository = "https://example.com"
+Issues = "https://example.com"
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "pytest-asyncio>=0.23",
+  "ruff>=0.4",
+]
+
+# Optional: local open-source model inference for demos/notebooks.
+transformers = [
+  "transformers>=4.38",
+  "accelerate>=0.27",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
