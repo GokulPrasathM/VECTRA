@@ -8,12 +8,13 @@ version = "0.1.0"
 description = "Improving LLM reasoning accuracy via multi-agent optimization (OpenAI-compatible)."
 readme = "README.md"
 requires-python = ">=3.10"
-authors = [{ name = "Your Name" }]
+authors = [{ name = "Gokul Prasath M", email = "beastgokul4@gmail.com" }]
 license = { file = "LICENSE" }
 keywords = ["llm", "reasoning", "reasoning-accuracy", "multi-agent", "optimization", "orchestration", "batching"]
 classifiers = [
   "Programming Language :: Python :: 3",
   "License :: OSI Approved :: Apache Software License",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
   "httpx>=0.26",
@@ -42,6 +43,8 @@ transformers = [
 
 [tool.setuptools]
 package-dir = {"" = "src"}
+include-package-data = true
+license-files = ["LICENSE"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
