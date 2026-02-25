@@ -9,11 +9,11 @@ description = "Improving LLM reasoning accuracy via multi-agent optimization (Op
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [{ name = "Your Name" }]
-license = { text = "Proprietary" }
+license = { file = "LICENSE" }
 keywords = ["llm", "reasoning", "reasoning-accuracy", "multi-agent", "optimization", "orchestration", "batching"]
 classifiers = [
   "Programming Language :: Python :: 3",
-  "License :: Other/Proprietary License",
+  "License :: OSI Approved :: Apache Software License",
 ]
 dependencies = [
   "httpx>=0.26",
@@ -23,9 +23,9 @@ dependencies = [
 vectra = "vectra.__main__:main"
 
 [project.urls]
-Documentation = "https://example.com"
-Repository = "https://example.com"
-Issues = "https://example.com"
+Documentation = "https://github.com/GokulPrasathM/VECTRA#readme"
+Repository = "https://github.com/GokulPrasathM/VECTRA"
+Issues = "https://github.com/GokulPrasathM/VECTRA/issues"
 
 [project.optional-dependencies]
 dev = [
