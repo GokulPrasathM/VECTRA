@@ -127,5 +127,5 @@ python -m twine upload dist/*
 ```
 
 Notes:
-- If the name `vectra` is already taken on PyPI, publish under a unique name (e.g. `vectra-ai`, `vectra-reasoning`) by changing `project.name` in `pyproject.toml`.
+- This project publishes to PyPI as `vectra-reasoning` (distribution name). The import package remains `vectra`.
 - The CLI entrypoint is `vectra` (or `python -m vectra`).
