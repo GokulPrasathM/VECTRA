@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import threading
 from dataclasses import dataclass
+from collections.abc import Mapping
 from typing import Any
 
 from .types import ChatMessage
@@ -87,16 +88,25 @@ class TransformersClient:
             )
         ]
 
-    def _messages_to_inputs(self, messages: list[ChatMessage]):
+    def _messages_to_inputs(self, messages: list[ChatMessage]) -> Any:
         try:
             apply = getattr(self._tokenizer, "apply_chat_template", None)
             if callable(apply):
                 chat = [{"role": m.role, "content": m.content} for m in messages]
-                return self._tokenizer.apply_chat_template(
+                rendered = self._tokenizer.apply_chat_template(
                     chat,
+                    tokenize=True,
                     add_generation_prompt=True,
                     return_tensors="pt",
                 )
+
+                # Depending on tokenizer/transformers version, this can be:
+                # - torch.Tensor
+                # - BatchEncoding (dict-like)
+                if hasattr(rendered, "shape"):
+                    return {"input_ids": rendered}
+                if isinstance(rendered, Mapping) and "input_ids" in rendered:
+                    return rendered
         except Exception:  # noqa: BLE001
             pass
 
@@ -105,13 +115,32 @@ class TransformersClient:
             parts.append(f"[{m.role.upper()}]\n{m.content}\n")
         parts.append("[ASSISTANT]\n")
         text = "\n".join(parts)
-        return self._tokenizer(text, return_tensors="pt").input_ids
+        return self._tokenizer(text, return_tensors="pt")
 
     def _generate_one(self, messages: list[ChatMessage], *, temperature: float, max_new_tokens: int) -> str:
-        input_ids = self._messages_to_inputs(messages)
+        encoding = self._messages_to_inputs(messages)
+
+        if isinstance(encoding, Mapping) and "input_ids" in encoding:
+            input_ids = encoding["input_ids"]
+        else:
+            raise TransformersBackendError(
+                "Tokenizer did not produce input_ids for generation; check tokenizer.apply_chat_template behavior"
+            )
 
         with self._lock:
-            input_ids = input_ids.to(self._model.device)
+            # Move tensors to the primary model device.
+            try:
+                encoding = encoding.to(self._model.device)
+                input_ids = encoding["input_ids"]
+            except Exception:  # noqa: BLE001
+                device = getattr(self._model, "device", None)
+                if device is not None:
+                    for k, v in list(encoding.items()):
+                        try:
+                            encoding[k] = v.to(device)
+                        except Exception:  # noqa: BLE001
+                            pass
+                    input_ids = encoding["input_ids"]
 
             do_sample = temperature > 0
             gen_kwargs: dict[str, Any] = {
@@ -121,9 +150,15 @@ class TransformersClient:
             if do_sample:
                 gen_kwargs["temperature"] = max(1e-3, float(temperature))
 
-            out = self._model.generate(input_ids=input_ids, **gen_kwargs)
+            if getattr(self._tokenizer, "pad_token_id", None) is None and getattr(
+                self._tokenizer, "eos_token_id", None
+            ) is not None:
+                gen_kwargs["pad_token_id"] = self._tokenizer.eos_token_id
 
-        gen = out[0, input_ids.shape[-1] :]
+            out = self._model.generate(**encoding, **gen_kwargs)
+
+        prompt_len = int(input_ids.shape[-1])
+        gen = out[0, prompt_len:]
         text = self._tokenizer.decode(gen, skip_special_tokens=True)
         return str(text).strip()
 
