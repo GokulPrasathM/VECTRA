@@ -169,6 +169,39 @@ class TransformersClient:
         except Exception:  # noqa: BLE001
             pass
 
+    def _input_device(self):
+        """Best-effort device for input tensors.
+
+        For `device_map='auto'`, the correct device is the one hosting the input
+        embeddings (often CPU when offloading). Using `model.device` can be wrong
+        because sharded models don't have a single canonical device.
+        """
+
+        # Prefer the device of the input embeddings (most reliable).
+        try:
+            emb = getattr(self._model, "get_input_embeddings", None)
+            if callable(emb):
+                layer = emb()
+                weight = getattr(layer, "weight", None)
+                dev = getattr(weight, "device", None)
+                if dev is not None:
+                    return dev
+        except Exception:  # noqa: BLE001
+            pass
+
+        # Fall back to first parameter device.
+        try:
+            params = getattr(self._model, "parameters", None)
+            if callable(params):
+                first = next(params())
+                dev = getattr(first, "device", None)
+                if dev is not None:
+                    return dev
+        except Exception:  # noqa: BLE001
+            pass
+
+        return getattr(self._model, "device", None)
+
     def _generate_batch(
         self,
         reqs: list[_ChatRequest],
@@ -181,12 +214,12 @@ class TransformersClient:
         prompts = [self._messages_to_prompt_text(r.messages) for r in reqs]
         encoding = self._tokenizer(prompts, return_tensors="pt", padding=True)
 
-        # Move tensors to the primary model device.
-        try:
-            encoding = encoding.to(self._model.device)
-        except Exception:  # noqa: BLE001
-            device = getattr(self._model, "device", None)
-            if device is not None:
+        # Move tensors to the device that hosts the input embeddings.
+        device = self._input_device()
+        if device is not None:
+            try:
+                encoding = encoding.to(device)
+            except Exception:  # noqa: BLE001
                 for k, v in list(encoding.items()):
                     try:
                         encoding[k] = v.to(device)
@@ -233,6 +266,10 @@ class TransformersClient:
         texts: list[str] = []
         for i, plen in enumerate(prompt_lens):
             gen = out[i, int(plen) :]
+            try:
+                gen = gen.detach().cpu()
+            except Exception:  # noqa: BLE001
+                pass
             text = self._tokenizer.decode(gen, skip_special_tokens=True)
             texts.append(str(text).strip())
         return texts
@@ -321,13 +358,13 @@ class TransformersClient:
             )
 
         with self._lock:
-            # Move tensors to the primary model device.
-            try:
-                encoding = encoding.to(self._model.device)
-                input_ids = encoding["input_ids"]
-            except Exception:  # noqa: BLE001
-                device = getattr(self._model, "device", None)
-                if device is not None:
+            # Move tensors to the device that hosts the input embeddings.
+            device = self._input_device()
+            if device is not None:
+                try:
+                    encoding = encoding.to(device)
+                    input_ids = encoding["input_ids"]
+                except Exception:  # noqa: BLE001
                     for k, v in list(encoding.items()):
                         try:
                             encoding[k] = v.to(device)
@@ -352,6 +389,10 @@ class TransformersClient:
 
         prompt_len = int(input_ids.shape[-1])
         gen = out[0, prompt_len:]
+        try:
+            gen = gen.detach().cpu()
+        except Exception:  # noqa: BLE001
+            pass
         text = self._tokenizer.decode(gen, skip_special_tokens=True)
         return str(text).strip()
 
